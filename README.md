@@ -15,8 +15,9 @@ for melody extraction in complex polyphonic scenarios.
 
 
 ## Environment Set
-	•	Python Version: 3.8.10
-	•	PyTorch Version: 1.13.1
+    •Python Version: 3.8.10
+    •PyTorch Version: 1.13.1
+ 
 
 
  python train_umamba_transformer.py --max_epochs 200 --batch_size 32 --output_dir_name '/home/wujammy/melody_extraction_model'
