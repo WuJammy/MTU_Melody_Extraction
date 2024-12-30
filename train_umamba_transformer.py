@@ -1,6 +1,8 @@
 from cProfile import label
 from pyexpat import model
 import re
+import time
+from turtle import st
 import librosa
 import numpy as np
 import matplotlib.pyplot as plt
@@ -19,14 +21,15 @@ import csv
 import os
 from statistics import mean
 import torch.nn.functional as F
-
 from mamba_transformer_unet.networks.vision_mamba_transformer import MambaTransformerUnet as ViT_seg 
 from mamba_transformer_unet.config import get_train_config
-from utils import get_medleydb_audio_names, Audio_dataset, DiceLoss, get_medleydb_vocal_audio_names, get_mir1k_audio_names
+from utils import get_medleydb_audio_names, Audio_dataset, DiceLoss, get_medleydb_vocal_audio_names, get_mir1k_audio_names, get_medleydb_train_audio_names,get_medleydb_validation_audio_names,get_medleydb_vocal_audio_names, get_medleydb_audio_names,get_orchset_name
 import torchsummary
 from torch.utils.data import ConcatDataset
 from pytorch_metric_learning import miners, losses
 import mir_eval
+from torchstat import stat
+from fvcore.nn import FlopCountAnalysis
 
 class OA_Loss(nn.Module):
     def __init__(self):
@@ -119,9 +122,13 @@ def train_mamba_transformer_unet(config, save=True):
 
     audio_medleydb_names = get_medleydb_audio_names()
     audio_mir1k_names = get_mir1k_audio_names(mik1k_folder_path='/home/wujammy/MIR-1K/Wavfile')
+    orchset_names = get_orchset_name()
+    medleydb_train_audio_names = get_medleydb_train_audio_names()
+    medleydb_validation_audio_names = get_medleydb_validation_audio_names()
     audio_vocal_medleydb_names = get_medleydb_vocal_audio_names()
     audio_nonvocal_medleydb_names = get_medleydb_audio_names()
     items_to_remove = []
+
 
     for name in audio_nonvocal_medleydb_names:
         if name in audio_vocal_medleydb_names:
@@ -135,6 +142,17 @@ def train_mamba_transformer_unet(config, save=True):
     model = ViT_seg(config, img_size=config.SPECTRUM.SHAPE[0],
                     num_classes=1).to(torch.device(device))
     
+   
+    # input_tensor = torch.randn(32, 6, 224, 224).to(torch.device(device))
+    # flops = FlopCountAnalysis(model, (input_tensor, ))
+
+    # print(f"FLOPs: {flops.total()/1e9:.2f} G")
+
+    # params = sum(p.numel() for p in model.parameters())
+    # print(f"Params: {params / 1e6:.2f} M")
+
+    
+
     #Check use pretrain model or not
     if config.MODEL.PRETRAIN_CKPT is None:
         pass
@@ -144,36 +162,43 @@ def train_mamba_transformer_unet(config, save=True):
     else:  
         model.load_from(config)
 
-    # model.load_state_dict(torch.load('/home/wujammy/melody_extraction_model/model_con1_06ce04dice_2data_mamba1input_patch22overlap_swintransformer_batch32_2221_50_m2_gua_0001.pth')) 
- 
+    # model.load_state_dict(torch.load('/home/wujammy/melody_extraction_model/model_mtu_200_batch32_c2_02bce08dice_mir1k_noguassionkernel13_sigmaX05_sigmaY1_eachcolumn_lr0001_3adamW0001.pth')) 
+    
     #Load training data
-    medleydb_train = Audio_dataset(audio_names=audio_medleydb_names, config=config, augmentation=False,dataset_name='medleydb')
-    # mir1k_train = Audio_dataset(audio_names=audio_mir1k_names, config=config, augmentation=False,dataset_name='mir1k')
+    orchset_train = Audio_dataset(audio_names=orchset_names, config=config, augmentation=False,dataset_name='orchset')
+    medleydb_train_dataset = Audio_dataset(audio_names=medleydb_train_audio_names, config=config, augmentation=False,dataset_name='medleydb')
+    medleydb_validation_dataset = Audio_dataset(audio_names=medleydb_validation_audio_names, config=config, augmentation=False,dataset_name='medleydb')
+    mir1k_train = Audio_dataset(audio_names=audio_mir1k_names, config=config, augmentation=False,dataset_name='mir1k')
+    
     # medleydb_vocal_train = Audio_dataset(audio_names=audio_vocal_medleydb_names, config=config, augmentation=False,dataset_name='medleydb')
     # medleydb_nonvocal_train = Audio_dataset(audio_names=audio_nonvocal_medleydb_names, config=config, augmentation=False,dataset_name='medleydb')
 
     #Concatenate two datasets
-    # dataset_train = ConcatDataset([medleydb_vocal_train, mir1k_train])
+    # dataset_train = ConcatDataset([medleydb_train, mir1k_train])
 
+    dataset_train = ConcatDataset([orchset_train, medleydb_train_dataset, mir1k_train])
+    # dataset_train = ConcatDataset([mir1k_train])
+    # dataset_train = ConcatDataset([orchset_train, medleydb_train_dataset])
+   
     #divide valid and train dataset 
-    train_size = int(0.9 * len(medleydb_train))
-    valid_size = len(medleydb_train) - train_size
+    # train_size = int(0.9 * len(medleydb_train))
+    # valid_size = len(medleydb_train) - train_size
 
-    train_dataset, valid_dataset = torch.utils.data.random_split(medleydb_train, [train_size, valid_size])
+    # train_dataset, valid_dataset = torch.utils.data.random_split(medleydb_train, [train_size, valid_size])
 
     # divide valid and train dataset
    
     def worker_init_fn(worker_id):
         random.seed(config.SEED + worker_id)
 
-    trainloader = DataLoader(train_dataset,
+    trainloader = DataLoader(dataset_train,
                              batch_size=config.TRAIN.BATCH_SIZE * config.TRAIN.N_GPU,
                              shuffle=True,
                              num_workers=16,
                              pin_memory=True,
                              worker_init_fn=worker_init_fn)
     
-    validloader = DataLoader(valid_dataset,
+    validloader = DataLoader(medleydb_validation_dataset,
                             batch_size=config.TRAIN.BATCH_SIZE * config.TRAIN.N_GPU,
                             shuffle=True,
                             num_workers=16,
@@ -183,6 +208,20 @@ def train_mamba_transformer_unet(config, save=True):
 
     if config.TRAIN.N_GPU > 1:
         model = nn.DataParallel(model)
+
+    # input_rand = torch.randn(32,6,224,224).to(torch.device(device))
+
+    # flops, params = profile(model, inputs=(input_rand, ))
+    # print('FLOPs: %.2f G' % (flops / 1e9))
+    # print('Params: %.2f M' % (params / 1e6))
+    # import time 
+    # torch.randn(32, 6, 224, 224)
+    # model.eval()
+    # start = time.time()
+    # model(torch.randn(32, 6, 224, 224).to(torch.device(device)))
+    # end = time.time()
+    # batch1_time = (end - start)/32
+    # print('Time: %.5f s' % batch1_time)
 
     model.train()
 
@@ -236,21 +275,23 @@ def train_mamba_transformer_unet(config, save=True):
 
             return focal_tversky_loss
         
+        # # flops 
+
     bce_loss = nn.BCELoss()
     cce_loss = nn.CrossEntropyLoss()
     dice_loss = DiceLoss(1)
     tversky_loss = FocalTverskyLoss(alpha=0.7, gamma=0.75)
     optimizer = optim.AdamW(model.parameters(),
                             lr=config.TRAIN.BASE_LR,
-                            weight_decay=0.001)
+                            weight_decay=0.0001)
+    # optimizer = optim.Adam(model.parameters(), lr=config.TRAIN.BASE_LR)
     iter_num = 0
     max_iterations = config.TRAIN.EPOCHS * len(trainloader)
     epoch_losses = []
     best_OA = 0
     best_epoch = 0
     no_improvement_epochs = 0
-    PATIENCE = 10
-    
+    PATIENCE = 5    
 
     if save:
         if not os.path.exists(config.OUTPUT_DIR_NAME):
@@ -260,6 +301,8 @@ def train_mamba_transformer_unet(config, save=True):
 
     for epoch_num in tqdm_iterator:
         batch_losses = []
+
+        epoch_start_time = time.time()
 
         for sampled_batch in trainloader:
             audio_batch, label_batch = sampled_batch['audio'], sampled_batch['label']
@@ -273,6 +316,15 @@ def train_mamba_transformer_unet(config, save=True):
             audio_batch = audio_batch.float()
 
             outputs = model(audio_batch).float()
+            
+            # # 獲取目前分配的記憶體（單位：位元組）
+            # allocated_memory = torch.cuda.memory_allocated()
+            # # 獲取目前預留的記憶體（單位：位元組）
+            # reserved_memory = torch.cuda.memory_reserved()
+
+            # print(f"Allocated Memory: {allocated_memory / 1024**3:.2f} GB")
+            # print(f"Reserved Memory: {reserved_memory / 1024**3:.2f} GB")
+         
 
             # 輸出時的dimension是(batch_size, channel, Width, Height)，把它排序回(batch_size, Height, Width, channel)
             outputs = outputs.permute(0, 3, 2, 1)
@@ -281,49 +333,11 @@ def train_mamba_transformer_unet(config, save=True):
             
             label_batch = label_batch.unsqueeze(3)
 
-            #calculate OA loss(1-OA)
-            # avg_eval_loss = 0
-
-            # for batch in range(outputs.size(0)):
-            #     est_freq = torch.argmax(outputs[batch].squeeze(), dim=0).cpu().detach().numpy()
-            #     ref_freq = torch.argmax(label_batch[batch].squeeze(), dim=0).cpu().detach().numpy()
-
-            #     centerfreq = librosa.cqt_frequencies(n_bins=config.SPECTRUM.N_BINS, fmin=librosa.note_to_hz('C2'),bins_per_octave=config.SPECTRUM.BINS_PER_OCTAVE)
-
-            #     ref_time = np.arange(0, ref_freq.shape[0]) / 100
-            #     est_time = np.arange(0, est_freq.shape[0]) /100
-
-            #     for i in range(len(est_freq)):
-            #         if est_freq[i] == 0:
-            #             est_freq[i] = 0
-            #         else:
-            #             est_freq[i] = centerfreq[int(est_freq[i])]
-
-            #     for i in range(len(ref_freq)):
-            #         if ref_freq[i] == 0:
-            #             ref_freq[i] = 0
-            #         else:
-            #             ref_freq[i] = centerfreq[int(ref_freq[i])]
-
-            #     eval = mir_eval.melody.evaluate(ref_time, ref_freq, est_time, est_freq)
-
-            #     train_OA = eval['Overall Accuracy']
-            #     train_VR = eval['Voicing Recall'] 
-            #     train_VFA = eval['Voicing False Alarm'] 
-            #     train_RPA = eval['Raw Pitch Accuracy'] 
-            #     train_RCA = eval['Raw Chroma Accuracy'] 
-
-            #     avg_eval = (train_OA + train_VR + (1-train_VFA) + train_RPA + train_RCA) / 5
-            #     avg_eval_loss += (1 - avg_eval)
-
-            # loss = avg_eval_loss / outputs.size(0)
-
-            #loss = bce_loss(outputs.float(), label_batch.float())
-
-
             loss = 0.2*cce_loss(outputs.float(), label_batch.float())+0.8*dice_loss(outputs.float(), label_batch.float())
-
-            # loss = bce_loss(outputs.float(), label_batch.float())    
+            # loss = cce_loss(outputs.float(), label_batch.float())
+            
+            # outputs = nn.Softmax(dim=1)(outputs)
+            # loss =0.2*bce_loss(outputs.float(), label_batch.float())+0.8*dice_loss(outputs.float(), label_batch.float())    
             # loss = tversky_loss(outputs.float(), label_batch.float())
             
             optimizer.zero_grad()
@@ -335,6 +349,10 @@ def train_mamba_transformer_unet(config, save=True):
             tqdm_iterator.set_description(f'Epoch [{epoch_num+1}/{config.TRAIN.EPOCHS}], Loss: {loss.item():.4f}')
 
             batch_losses.append(loss.item())
+
+        epoch_end_time = time.time()
+        minute_epoch_time = (epoch_end_time - epoch_start_time) / 60
+        print('layer 1 Time: %.2f min' % minute_epoch_time)
 
         lr_ = config.TRAIN.BASE_LR * (1.0 - epoch_num / config.TRAIN.EPOCHS)**0.9
         for param_group in optimizer.param_groups:
@@ -412,15 +430,14 @@ def train_mamba_transformer_unet(config, save=True):
             #early stopping
             if OA > best_OA:
                 best_OA = OA
-                no_improvement_epochs = 0
+                best_epoch = epoch_num
                 if save:
                     torch.save(model.state_dict(),
-                        os.path.join(config.OUTPUT_DIR_NAME, 'model_mtu_200_02ce08dice32_medleydb_guassionkernel19_sigmaX0_sigmaY4.pth'))
-                else:
-                    no_improvement_epochs += 1
-                
-                if no_improvement_epochs >= PATIENCE:
-                    break
+                        os.path.join(config.OUTPUT_DIR_NAME, 'model_mtu.pth'))
+            print(" patience ",epoch_num-best_epoch)
+            if epoch_num - best_epoch >= PATIENCE:
+                print('Early stopping at epoch {}'.format(epoch_num))
+                break
 
         model.train()
                     
@@ -437,7 +454,7 @@ def train_mamba_transformer_unet(config, save=True):
 
     # 儲存
     if save:
-        # torch.save(model.state_dict(), os.path.join(config.OUTPUT_DIR_NAME, 'model_mtu_01ce09dice_medleydb_200.pth'))
+        # torch.save(model.state_dict(), os.path.join(config.OUTPUT_DIR_NAME, 'model_2dataset_finalepoch_3adam_adamW0001_layer1.pth'))
         plt.plot(epoch_losses)
         plt.title('loss')
         plt.ylabel('loss')

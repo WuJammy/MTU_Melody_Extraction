@@ -7,6 +7,7 @@ from pydub import AudioSegment
 import librosa
 import numpy as np
 import math
+from pyparsing import col
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
@@ -41,6 +42,15 @@ class Audio_dataset(Dataset):
                 audio_segment_time=config.SEGMENT.AUDIO_SEGMENT_TIME,
                 overlap_time=config.SEGMENT.OVERLAP_TIME,
                 label_segment_length=65)
+        elif dataset_name == 'orchset':
+            self.audio_segments, self.label_segments = get_orchsset_audio_and_label_segments(
+                audio_names=audio_names,
+                padding_audio_path=config.PADDING_AUDIO_PATH,
+                audio_folder=config.Orchset.AUDIO_PATH,
+                label_folder=config.Orchset.LABEL_PATH,
+                audio_segment_time=config.SEGMENT.AUDIO_SEGMENT_TIME,
+                overlap_time=config.SEGMENT.OVERLAP_TIME,
+                label_segment_length=130)
             
         self.config = config
         self.dataset_name = dataset_name
@@ -50,15 +60,18 @@ class Audio_dataset(Dataset):
 
     def __getitem__(self, idx):
         global p_flag
-        pitch_label = self.label_segments[idx]
+        pitch_label = self.label_segments[idx]          
 
         cqt_frenquency = librosa.cqt_frequencies(
             n_bins=self.config.SPECTRUM.N_BINS,
             bins_per_octave=self.config.SPECTRUM.BINS_PER_OCTAVE,
             fmin=librosa.note_to_hz('C2'))
         
-        if self.dataset_name == 'medleydb':
+        if self.dataset_name == 'medleydb' :
             map_label = seq2map(pitch_label, cqt_frenquency)
+        elif self.dataset_name == 'orchset':
+            map_label = seq2map(pitch_label, cqt_frenquency)                  
+            map_label = cv2.resize(map_label, (224, 224))
             
         elif self.dataset_name == 'mir1k':
             pitch_label = pitchmidi_to_hz(pitch_label) #midi to hz
@@ -68,9 +81,20 @@ class Audio_dataset(Dataset):
             map_label = cv2.resize(map_label, (224, 224))
 
         #map_label做guassian blur
-        map_label = cv2.GaussianBlur(map_label, (1, 9),sigmaX=0, sigmaY=4)
-        # map_label = F.softmax(torch.tensor(map_label/3),dim=0).numpy()
+        blur_label = np.zeros_like(map_label)
+        
+        for i in range(map_label.shape[1]):
+            column = map_label[:, i]
+            blur_column = cv2.GaussianBlur(column.reshape(-1, 1), (1, 3), sigmaX=0.5, sigmaY=1)
+            blur_label[:, i] = blur_column.flatten()
 
+        map_label = blur_label
+
+        
+
+
+        # map_label = cv2.GaussianBlur(map_label, (1, 5),sigmaX=0.5, sigmaY=1.1)
+        # map_label = F.softmax(torch.tensor(map_label/3),dim=0).numpy()
         # map_label = cv2.resize(map_label, (224, 224))
 
         audio_y, audio_sr = self.audio_segments[idx], 44100
@@ -273,6 +297,49 @@ def get_medleydb_vocal_audio_names():
 
 
     return audio_names
+
+
+def get_medleydb_train_audio_names():
+    audio_names_non_vocal_path = '/home/wujammy/melody_extraction_swin/medleydb_train_names.txt'
+
+    audio_names = []
+
+    with open(audio_names_non_vocal_path, 'r') as f:
+        for line in f:
+            audio_names.append(line.strip())
+
+    return audio_names
+
+def get_medleydb_test_audio_names():
+    audio_names_non_vocal_path = '/home/wujammy/melody_extraction_swin/medleydb_test_names.txt'
+
+    audio_names = []
+
+    with open(audio_names_non_vocal_path, 'r') as f:
+        for line in f:
+            audio_names.append(line.strip())
+
+    return audio_names
+
+def get_medleydb_validation_audio_names():
+    audio_names_non_vocal_path = '/home/wujammy/melody_extraction_swin/medleydb_valid_names.txt'
+
+    audio_names = []
+
+    with open(audio_names_non_vocal_path, 'r') as f:
+        for line in f:
+            audio_names.append(line.strip())
+
+    return audio_names
+
+def get_orchset_name():
+
+    orchset_path = '/home/wujammy/Orchset'
+    
+    #get all audio names(in dir)
+    audio_names = [os.path.splitext(f)[0] for f in os.listdir(orchset_path) if f.endswith('.wav')]
+    
+    return audio_names 
 
 def get_all_audio_and_label_segments(audio_names, padding_audio_path, audio_segment_time: int,
                                      overlap_time: int, label_segment_length: int,
@@ -510,6 +577,8 @@ def mir1k_segment_audio_and_label(audio_path, padding_audio_path, label_path, au
         start_index = audio_start_time_to_label_start_index(start_time, label_sampling_time)
         label_chunk = input_label[start_index:start_index + label_segment_length]
 
+    
+
         if len(audio_chunk) != audio_segment_time:  # 最後一個segment可能會不滿segment_time時間，所以要做padding
             pad_time = audio_segment_time - len(audio_chunk)
 
@@ -564,3 +633,86 @@ def get_mir1k_audio_and_label_segments(audio_names, padding_audio_path, audio_fo
 
     return audio_segments, label_segments
 
+def orchsset_segment_audio_and_label(audio_path, padding_audio_path, label_path, audio_segment_time: int,
+                            overlap_time: int, label_segment_length: int):
+    
+    audio_segments, label_segments = [], []
+    input_audio = AudioSegment.from_file(audio_path) 
+    padding_audio = AudioSegment.from_file(padding_audio_path)
+    input_label = np.loadtxt(label_path,dtype=float)
+    
+      # 若input音檔為multi-channel，則將channels combine
+    if input_audio.channels != 1:
+        monos = input_audio.split_to_mono()
+        output = monos[0]
+
+        for i in range(1, len(monos)):
+            output = output.overlay(monos[i])
+
+        input_audio = output
+    
+    input_audio_time = len(input_audio)
+    start_time = int(0)
+    stop_time = audio_segment_time
+    
+    while start_time < input_audio_time:
+        # 切割音檔
+        audio_chunk = input_audio[start_time:stop_time]
+
+        # 切割label檔
+        label_sampling_time = 0.01
+        start_index = audio_start_time_to_label_start_index(start_time, label_sampling_time)
+        label_chunk = input_label[start_index:start_index + label_segment_length,1]
+
+        if len(audio_chunk) != audio_segment_time or label_chunk.shape[0] != label_segment_length:  # 最後一個segment可能會不滿segment_time時間，所以要做padding
+            pad_time = audio_segment_time - len(audio_chunk)
+
+            merge_part = padding_audio[0:pad_time]
+
+            # 調整聲音大小
+            db = audio_chunk.dBFS - merge_part.dBFS
+            merge_part += db
+
+            # padding audio_chunk
+            audio_chunk += merge_part
+
+            # padding label_chunk
+            label_chunk = np.append(label_chunk, np.zeros(label_segment_length - len(label_chunk)))
+
+        # AudioSegment轉librosa格式
+        samples = audio_chunk.get_array_of_samples()
+        arr = np.array(samples).astype(np.float32) / 32768
+        arr = librosa.core.resample(y=arr,
+                                    orig_sr=audio_chunk.frame_rate,
+                                    target_sr=44100,
+                                    res_type='kaiser_best')
+        audio_segments.append(arr)
+        label_segments.append(label_chunk)
+
+        start_time = stop_time - overlap_time
+        stop_time = start_time + audio_segment_time
+
+    return audio_segments, label_segments
+
+
+def get_orchsset_audio_and_label_segments(audio_names, padding_audio_path, audio_folder, label_folder, audio_segment_time: int,
+                            overlap_time: int, label_segment_length: int):
+ 
+    audio_segments, label_segments = [], []
+
+    for audio_name in tqdm(audio_names,desc="Processing Orchset files"):
+        audio_path = audio_folder + '/' + audio_name + '.wav'
+        label_path = label_folder + '/' + audio_name + '.mel'
+
+        tmp1, tmp2 = orchsset_segment_audio_and_label(
+            audio_path=audio_path,
+            padding_audio_path=padding_audio_path,
+            label_path=label_path,
+            audio_segment_time=audio_segment_time,
+            overlap_time=overlap_time,
+            label_segment_length=label_segment_length,)
+
+        audio_segments.extend(tmp1)
+        label_segments.extend(tmp2)
+
+    return audio_segments, label_segments

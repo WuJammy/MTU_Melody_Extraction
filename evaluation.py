@@ -19,13 +19,26 @@ import random
 import torch
 import torch.backends.cudnn as cudnn
 
+from mamba_unet.predict_model import melody_extraction_mamba_unet_model
+from unet_tensorflow.predict_model import melody_extraction_unet_tensorflow_model
+from unet_pytorch.predict_model import melody_extraction_unet_pytorch_model
+from swinunet.predict_model import melody_extraction_swinunet_model
 from mamba_transformer_unet.predict_model import melody_extraction_mamba_transformer_unet_model
+from unet_tensorflow.config import get_test_config as get_unet_tensorflow_test_config
+from unet_pytorch.config import get_test_config as get_unet_pytorch_test_config
+from swinunet.config import get_test_config as get_swinunet_test_config
+from mamba_unet.config import get_test_config as get_mamba_unet_test_config
 from mamba_transformer_unet.config import get_test_config as get_mamba_transformer_unet_test_config
 from utils import spectrum_to_pitches
+import medleydb as mdb
 
 
-def get_groundtruth(label_path, audio_time):
-    groundtruth = np.loadtxt(label_path)
+def get_groundtruth(label_path, audio_time, label_type='None'):
+    if label_type == 'mdb':
+        groundtruth = np.loadtxt(label_path, delimiter=',')
+    else:    
+        groundtruth = np.loadtxt(label_path)
+        
 
     # groundtruth padding
     padding_time = audio_time / 1000 - groundtruth[-1, 0]
@@ -56,13 +69,89 @@ def compute_metrics(timestamps, groundtruth, prediction):
     ],
                     dtype=float)
 
+def change_midifile(hz_array, output_path):
+    from midiutil.MidiFile import MIDIFile
 
-def evaluation_audio(model, audio_path, label_path, config):
+    # hz to note(librosa) if hz = 0 then midi = -1
+    for i in range(len(hz_array)):
+        if hz_array[i] == 0:
+                 hz_array[i] = 0
+        else:
+            hz_array[i] = int(librosa.hz_to_midi(hz_array[i]))
+
+    #find same note(duration)
+    notes = []
+    note_start_time = 0
+    now = 0
+    note_start_index = 0
+
+    while True:
+        # 當前音符頻率
+        same_note = hz_array[now]
+        # 尋找所有與當前音符相同的頻率並累加到 now
+        for i in range(now, len(hz_array)):
+            if hz_array[i] == same_note:
+                now = i + 1
+            else:
+                break
+
+        # 計算音符持續時間
+        duration = (now - note_start_index) * 0.0058
+
+        # 記錄音符和其對應的時間段
+        notes.append([same_note, note_start_time, note_start_time + duration])
+
+        # 更新音符開始時間
+        note_start_index = now
+        note_start_time += duration
+
+        # 如果處理到最後，結束
+        if now >= len(hz_array):
+            break
+
+    # Create the MIDIFile Object
+    MyMIDI = MIDIFile(1)
+    track = 0
+    time = 0
+    MyMIDI.addTrackName(track, time, "Sample Track")
+    MyMIDI.addTempo(track, time, 60)
+    # Add a note. addNote expects the following information:
+    channel = 0
+    pitch = 0
+    time = 0
+    volume = 127
+    # Now add the note.
+    for i in range(len(notes)):
+        if notes[i][0] == 0:
+            continue
+        pitch = int(notes[i][0])
+        onset = notes[i][1]
+        duration = notes[i][2] - notes[i][1]
+        MyMIDI.addNote(track, channel, pitch, onset, duration, volume)
+
+    #change instrument
+    MyMIDI.addProgramChange(track, channel, time, 71)
+
+    # And write it to disk.
+    binfile = open(output_path, 'wb')
+    MyMIDI.writeFile(binfile)
+    binfile.close()
+
+def evaluation_audio(model, audio_path, label_path, config, label_type='None'):
+    #calculate batch size=1(1.3s) cost time(predict)
     spectrums = model.predict(audio_path)
 
     input_audio_time = len(AudioSegment.from_file(audio_path))
 
-    groundtruth = get_groundtruth(label_path, input_audio_time)
+    groundtruth = get_groundtruth(label_path, input_audio_time,label_type=label_type)
+    # get groundtruth midi
+    hz_array = groundtruth[:, 1]
+
+    # get file name
+    file_name = os.path.basename(audio_path).split('/')[-1].split('.')[0]
+
+    # #change midifile
+    change_midifile(hz_array, f'/home/wujammy/melody_extraction_swin/test_midi/{file_name}_gt.mid')
 
     # concate spectrums
     start_time = int(0)
@@ -106,6 +195,9 @@ def evaluation_audio(model, audio_path, label_path, config):
 
     # 取得prediction值
     prediction = np.array(spectrum_to_pitches(merge_spectrum, config))
+
+    #change midifile
+    change_midifile(prediction, f'/home/wujammy/melody_extraction_swin/test_midi/{file_name}_mtu.mid')    
 
     return compute_metrics(groundtruth[:, 0], groundtruth[:, 1], prediction)
 
@@ -154,24 +246,40 @@ def evaluation_model(tests, args=None, save=True, model=None):
 
     for test_cnt, (folder_path, audio_suffix, label_suffix) in enumerate(tests):
         test_audio_names = []
+        
+        if audio_suffix == 'mdb':
+            with open(folder_path, 'r') as f:
+                test_audio_names = f.read().splitlines()
+            all_test_audio_names.append(test_audio_names)
+            evaluation_metrics_matrices.append(np.zeros((len(test_audio_names), 5), dtype=float))
 
-        # 取得所有要測試的檔案的檔名
-        path = pathlib.Path(folder_path)
-        for element in list(path.glob("*.wav")):
-            test_audio_names.append(pathlib.Path(element).stem)
+            for audio_cnt, test_audio_name in enumerate(test_audio_names):
+                audio_path = mdb.MultiTrack(test_audio_name).mix_path
+                label_path = mdb.MultiTrack(test_audio_name).melody2_fpath
 
-        all_test_audio_names.append(test_audio_names)
+                print(test_audio_name)
 
-        evaluation_metrics_matrices.append(np.zeros((len(test_audio_names), 5), dtype=float))
+                evaluation_metrics_matrices[test_cnt][audio_cnt] = evaluation_audio(
+                    model=model, audio_path=audio_path, label_path=label_path, config=config, label_type='mdb')
+                
+        else:
+            # 取得所有要測試的檔案的檔名
+            path = pathlib.Path(folder_path)
+            for element in list(path.glob("*.wav")):
+                test_audio_names.append(pathlib.Path(element).stem)
 
-        for audio_cnt, test_audio_name in enumerate(test_audio_names):
-            audio_path = os.path.join(folder_path, f'{test_audio_name}{audio_suffix}')
-            label_path = os.path.join(folder_path, f'{test_audio_name}{label_suffix}')
+            all_test_audio_names.append(test_audio_names)
 
-            print(test_audio_name)
+            evaluation_metrics_matrices.append(np.zeros((len(test_audio_names), 5), dtype=float))
 
-            evaluation_metrics_matrices[test_cnt][audio_cnt] = evaluation_audio(
-                model=model, audio_path=audio_path, label_path=label_path, config=config)
+            for audio_cnt, test_audio_name in enumerate(test_audio_names):
+                audio_path = os.path.join(folder_path, f'{test_audio_name}{audio_suffix}')
+                label_path = os.path.join(folder_path, f'{test_audio_name}{label_suffix}')
+
+                print(test_audio_name)
+
+                evaluation_metrics_matrices[test_cnt][audio_cnt] = evaluation_audio(
+                    model=model, audio_path=audio_path, label_path=label_path, config=config)
 
         average_evaluation_metrics_matrix[test_cnt] = np.mean(evaluation_metrics_matrices[test_cnt],
                                                               axis=0)
@@ -240,9 +348,11 @@ if __name__ == '__main__':
     # args.accuracy_file_name = 'orchset_accuracy.csv'
 
 
-    tests = [('/home/wujammy/adc2004_full_set/', '.wav', 'REF.txt'),
-             ('/home/wujammy/mirex05TrainFiles/', '.wav', 'REF.txt'),
-             ('/home/wujammy/Orchset/', '.wav', '.mel')]  # 預設音檔和ground truth會放在同一個資料夾內
+    tests = [ ('/home/wujammy/mirex05TrainFiles/', '.wav', 'REF.txt'),
+              ('/home/wujammy/adc2004_full_set/', '.wav', 'REF.txt'),
+              ('/home/wujammy/melody_extraction_swin/medleydb_test_names.txt','mdb','mdb'),
+            #  ('/home/wujammy/Orchset/', '.wav', '.mel')
+             ]  # 預設音檔和ground truth會放在同一個資料夾內
 
     arg_dicts = []
 

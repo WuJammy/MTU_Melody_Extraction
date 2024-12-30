@@ -1,6 +1,6 @@
 from distutils import config
-import imp
 from re import I, S
+from cv2 import exp
 from matplotlib.pyplot import sca
 from numpy import short
 from regex import M, R
@@ -395,7 +395,6 @@ class PatchMerging(nn.Module):
         """
         x: B, H*W, C
         """
-
         H, W = self.input_resolution
         B, L, C = x.shape
         assert L == H * W, "input feature has wrong size"
@@ -412,7 +411,6 @@ class PatchMerging(nn.Module):
 
         x = self.norm(x)
         x = self.reduction(x)
-
         return x
 
     def extra_repr(self) -> str:
@@ -485,10 +483,14 @@ class MambaBlock(nn.Module):
     def __init__(self,dim_model):
         super(MambaBlock, self).__init__()
         self.rmsnorm_mamba = RMSNorm(d = dim_model)
-        self.mamba_cf = Mamba(d_model=dim_model)
-        self.mamba_cb = Mamba(d_model=dim_model)
-        self.mamba_rf = Mamba(d_model=dim_model)
-        self.mamba_rb = Mamba(d_model=dim_model)
+        self.mamba_rm = Mamba(d_model=dim_model)
+        self.mamba_rmf = Mamba(d_model=dim_model)
+        self.mamba_cm = Mamba(d_model=dim_model)
+        self.mamba_cmf = Mamba(d_model=dim_model)
+        # self.mamba_cfreverse = Mamba(d_model=dim_model)
+        # self.mamba_cbreverse = Mamba(d_model=dim_model)
+        # self.mamba_rfreverse = Mamba(d_model=dim_model)
+        # self.mamba_rbreverse = Mamba(d_model=dim_model)
         self.rmsnorm_mlp = RMSNorm(d = dim_model)
         self.mlp = Mlp(in_features=dim_model, hidden_features=dim_model*4, out_features=dim_model, act_layer=nn.GELU, drop=0.0)
         self.drop_path = DropPath(0.2)
@@ -500,66 +502,118 @@ class MambaBlock(nn.Module):
         input = x
         x = self.rmsnorm_mamba(x)
 
-        #mamba scan column front
-        scan_cf = self.mamba_cf(x)
-        shortcut_cf = self.drop_path(scan_cf)+input
-
-        #mamba scan column back
-        scan_cb = torch.flip(x, dims=[1])
-        scan_cb = self.mamba_cb(scan_cb)
-        shortcut_cb = torch.flip(self.drop_path(scan_cb),dims=[1])
-
-        #mamba scan row front
-        scan_rf = x.view(b, int(n**0.5), int(n**0.5), -1)
-        scan_rf = scan_rf.permute(0, 3, 2, 1) #row to column && change to (b, c, w, h)
-        scan_rf = scan_rf.flatten(2) #flatten w and h
-        scan_rf = scan_rf.permute(0, 2, 1) #change to (b, w*h, c)
-        scan_rf = self.drop_path(self.mamba_rf(scan_rf))
+        #Mamba Row Major
+        rm = self.mamba_rm(x)
+        shortcut_rm = self.drop_path(rm)+input
+        
+        #Mamba Row Major Flip
+        rmf = torch.flip(x, dims=[1])
+        rmf = self.mamba_rmf(rmf)
+        shortcut_rmf = torch.flip(self.drop_path(rmf),dims=[1])
+        
+        #Mamba Column Major
+        cm = x.view(b, int(n**0.5), int(n**0.5), -1)
+        cm = cm.permute(0, 3, 2, 1) #row to column && change to (b, c, w, h)
+        cm = cm.flatten(2) #flatten w and h
+        cm = cm.permute(0, 2, 1) #change to (b, w*h, c)
+        cm = self.drop_path(self.mamba_cm(cm))
         # change to original shape
-        scan_rf = scan_rf.view(b, int(n**0.5), int(n**0.5), -1)
-        scan_rf = scan_rf.permute(0, 3, 2, 1) #change to (b, c, h, w)
-        scan_rf = scan_rf.flatten(2)
-        scan_rf = scan_rf.permute(0, 2, 1)
-        shortcut_rf = scan_rf
-
-        #mamba scan row back
-        scan_rb = torch.flip(x, dims=[1])
-        scan_rb = scan_rb.view(b, int(n**0.5), int(n**0.5), -1)
-        scan_rb = scan_rb.permute(0, 3, 2, 1) #row to column && change to (b, c, w, h)
-        scan_rb = scan_rb.flatten(2) #flatten w and h
-        scan_rb = scan_rb.permute(0, 2, 1) #change to (b, w*h, c)
-        scan_rb = self.drop_path(self.mamba_rb(scan_rb))
+        cm = cm.view(b, int(n**0.5), int(n**0.5), -1)
+        cm = cm.permute(0, 3, 2, 1) #change to (b, c, h, w)
+        cm = cm.flatten(2)
+        shortcut_cm= cm.permute(0, 2, 1)
+        
+        #Mamba Column Major Flip
+        cmf = torch.flip(x, dims=[1])
+        cmf = cmf.view(b, int(n**0.5), int(n**0.5), -1)
+        cmf = cmf.permute(0, 3, 2, 1) #row to column && change to (b, c, w, h)
+        cmf = cmf.flatten(2) #flatten w and h
+        cmf = cmf.permute(0, 2, 1) #change to (b, w*h, c)
+        cmf = self.drop_path(self.mamba_cmf(cmf))
         # change to original shape
-        scan_rb = torch.flip(scan_rb,dims=[1])
-        scan_rb = scan_rb.view(b, int(n**0.5), int(n**0.5), -1)
-        scan_rb = scan_rb.permute(0, 3, 2, 1) #change to (b, c, h, w)
-        scan_rb = scan_rb.flatten(2)
-        scan_rb = scan_rb.permute(0, 2, 1)
-        shortcut_rb = torch.flip(scan_rb,dims=[2])
+        cmf = torch.flip(cmf,dims=[1])
+        cmf = cmf.view(b, int(n**0.5), int(n**0.5), -1)
+        cmf = cmf.permute(0, 3, 2, 1) #change to (b, c, h, w)
+        cmf = cmf.flatten(2)
+        cmf = cmf.permute(0, 2, 1)
+        shortcut_cmf = torch.flip(cmf,dims=[2])
 
-        shortcut_add_all = shortcut_cb+shortcut_cf+shortcut_rf+shortcut_rb
+        '''
+        ###############another direction change################
+        x_nochange = x.view(b, int(n**0.5), int(n**0.5), -1)
+        x_nochange = x_nochange.permute(0, 3, 1, 2)
+        x_r2l = torch.flip(x_nochange, dims=[3])
+        x_t2b = torch.flip(x_nochange, dims=[2])
+
+        #mamba scan column front(reverse)
+        x_r2l_flatten = x_r2l.flatten(2)
+        x_r2l_flatten = x_r2l_flatten.permute(0, 2, 1)
+        scan_cfreverse = self.mamba_cfreverse(x_r2l_flatten)
+        shortcut_cfr = self.drop_path(scan_cfreverse)
+        shortcut_cfr = shortcut_cfr.view(b, int(n**0.5), int(n**0.5), -1)
+        shortcut_cfr = shortcut_cfr.permute(0, 3, 1, 2)
+        shortcut_cfr = torch.flip(shortcut_cfr,dims=[3])
+        shortcut_cfr = shortcut_cfr.flatten(2)
+        shortcut_cfr = shortcut_cfr.permute(0, 2, 1)
+
+        #mamba scan column back(reverse)
+        scan_cbreverse = torch.flip(x_r2l_flatten, dims=[1])
+        scan_cbreverse = self.mamba_cbreverse(scan_cbreverse)
+        shortcut_cbr = torch.flip(self.drop_path(scan_cbreverse),dims=[1])
+        shortcut_cbr = shortcut_cbr.view(b, int(n**0.5), int(n**0.5), -1)
+        shortcut_cbr = shortcut_cbr.permute(0, 3, 1, 2)
+        shortcut_cbr = torch.flip(shortcut_cbr,dims=[3])
+        shortcut_cbr = shortcut_cbr.flatten(2)
+        shortcut_cbr = shortcut_cbr.permute(0, 2, 1)
+
+        #mamba scan row front(reverse)
+        x_t2b_flatten = x_t2b.flatten(2)
+        x_t2b_flatten = x_t2b_flatten.permute(0, 2, 1)
+
+        scan_rfreverse = x_t2b_flatten.view(b, int(n**0.5), int(n**0.5), -1)
+        scan_rfreverse = scan_rfreverse.permute(0, 3, 2, 1)
+        scan_rfreverse = scan_rfreverse.flatten(2)
+        scan_rfreverse = scan_rfreverse.permute(0, 2, 1)
+
+        scan_rfreverse = self.drop_path(self.mamba_rfreverse(scan_rfreverse))
+        scan_rfreverse = scan_rfreverse.view(b, int(n**0.5), int(n**0.5), -1)
+        scan_rfreverse = scan_rfreverse.permute(0, 3, 2, 1)
+        scan_rfreverse = scan_rfreverse.flatten(2)
+        scan_rfreverse = scan_rfreverse.permute(0, 2, 1)
+        shortcut_rfr = scan_rfreverse
+        shortcut_rfr = shortcut_rfr.view(b, int(n**0.5), int(n**0.5), -1)
+        shortcut_rfr = shortcut_rfr.permute(0, 3, 1, 2)
+        shortcut_rfr = torch.flip(shortcut_rfr,dims=[2])
+        shortcut_rfr = shortcut_rfr.flatten(2)
+        shortcut_rfr = shortcut_rfr.permute(0, 2, 1)
+
+
+        #mamba scan row back(reverse)
+        scan_rbreverse = torch.flip(x_t2b_flatten, dims=[1])
+        scan_rbreverse = scan_rbreverse.view(b, int(n**0.5), int(n**0.5), -1)
+        scan_rbreverse = scan_rbreverse.permute(0, 3, 2, 1)
+        scan_rbreverse = scan_rbreverse.flatten(2)
+        scan_rbreverse = scan_rbreverse.permute(0, 2, 1)
+        scan_rbreverse = self.drop_path(self.mamba_rbreverse(scan_rbreverse))
+
+        scan_rbreverse = torch.flip(scan_rbreverse,dims=[1])
+        scan_rbreverse = scan_rbreverse.view(b, int(n**0.5), int(n**0.5), -1)
+        scan_rbreverse = scan_rbreverse.permute(0, 3, 2, 1)
+        scan_rbreverse = scan_rbreverse.flatten(2)
+        scan_rbreverse = scan_rbreverse.permute(0, 2, 1)
+        shortcut_rbr = torch.flip(scan_rbreverse,dims=[2])
+        shortcut_rbr = shortcut_rbr.view(b, int(n**0.5), int(n**0.5), -1)
+        shortcut_rbr = shortcut_rbr.permute(0, 3, 1, 2)
+        shortcut_rbr = torch.flip(shortcut_rbr,dims=[2])
+        shortcut_rbr = shortcut_rbr.flatten(2)
+        shortcut_rbr = shortcut_rbr.permute(0, 2, 1)
+        '''
+        
+        shortcut_add_all = shortcut_rm+shortcut_rmf+shortcut_cm+shortcut_cmf
     
         output = self.rmsnorm_mlp(shortcut_add_all)
         output = self.drop_path(self.mlp(output))+shortcut_add_all
         return output
-    
-# class TransformerBlock(nn.Module):
-#     def __init__(self, dim_model):
-#         super(TransformerBlock, self).__init__()
-#         self.rmsnorm_1 = RMSNorm(d = dim_model)
-#         self.transformer = nn.TransformerEncoderLayer(d_model=dim_model, nhead=12, activation='gelu', dim_feedforward=96)
-#         self.rmsnorm_2 = RMSNorm(d = dim_model)
-#         self.mlp = Mlp(in_features=dim_model, hidden_features=dim_model*4, out_features=dim_model, act_layer=nn.GELU, drop=0.0)
-#         self.drop_path = DropPath(0.5)
-
-#     def forward(self, x):
-#         input = x
-#         x = self.rmsnorm_1(x)
-#         x = self.transformer(x)
-#         shortcut = self.drop_path(x)+input
-#         x = self.rmsnorm_2(shortcut)
-#         x = self.drop_path(self.mlp(x))+shortcut
-#         return x
     
 class BasicLayer(nn.Module):
 
@@ -580,7 +634,7 @@ class BasicLayer(nn.Module):
         # 並且加入mamba block
         self.blocks = nn.ModuleList([MambaBlock(dim_model=dim) for i in range(depth)])
         if depth == 1:
-            self.transformer_blocks = SwinTransformerBlock( dim=768, 
+            self.transformer_blocks = SwinTransformerBlock( dim=768,#dim=768 
                                                             input_resolution=input_resolution, 
                                                             num_heads=24, 
                                                             window_size=7, 
@@ -761,20 +815,10 @@ class PatchEmbed(nn.Module):
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(ConvBlock, self).__init__()
-        # self.norm = torch.nn.BatchNorm2d(in_channels)
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=True)
-        # self.gelu1 = nn.GELU()
-        # self.conv2 = nn.Conv2d(in_channels//2, in_channels//4, kernel_size=1, bias=True)
-        # self.gelu2 = nn.GELU()
-        # self.conv3 = nn.Conv2d(in_channels//4, out_channels, kernel_size=1, bias=True)
 
     def forward(self, x):
-        # x = self.norm(x)
         out = self.conv1(x)
-        # out = self.gelu1(out)
-        # out = self.conv2(out)
-        # out = self.gelu2(out)
-        # out = self.conv3(out)
         return out
 
 class MambaTransformerSys(nn.Module):
@@ -916,6 +960,7 @@ class MambaTransformerSys(nn.Module):
     #Encoder and Bottleneck
     def forward_features(self, x):
         x = self.patch_embed(x)
+        
         x_downsample = []
 
         for layer in self.layers:
@@ -932,7 +977,7 @@ class MambaTransformerSys(nn.Module):
             if inx == 0:
                 x = layer_up(x)
             else:
-                x = torch.cat([x, x_downsample[3 - inx]], -1)
+                x = torch.cat([x, x_downsample[3 - inx]], -1) #3
                 x = self.concat_back_dim[inx](x)
                 x = layer_up(x)
 

@@ -16,7 +16,7 @@ class melody_extraction_mamba_transformer_unet_model:
         self.model = ViT_seg(config, img_size=config.SPECTRUM.SHAPE[0],
                              num_classes=1).to(torch.device(self.device))
         self.model.load_state_dict(
-            torch.load(os.path.abspath(config.TEST.MODEL_PATH), map_location=self.device))
+            torch.load(os.path.abspath(config.TEST.MODEL_PATH), map_location=self.device), strict=False)
 
         self.config = config
 

@@ -71,11 +71,20 @@ _C.SPECTRUM.SHAPE = (_C.SPECTRUM.N_BINS,
                      )  # 以medleydb為例，unet是(360, 517)，swinunet是(224, 224)
 
 # -----------------------------------------------------------------------------
-# MIR-1K dataset settings
+# Orchset dataset settings
+# -----------------------------------------------------------------------------
+_C.Orchset = CN()
+_C.Orchset.AUDIO_PATH = os.path.abspath('/home/wujammy/Orchset')
+_C.Orchset.LABEL_PATH = os.path.abspath('/home/wujammy/Orchset')
+
+# -----------------------------------------------------------------------------
+#  dataset settings
 # -----------------------------------------------------------------------------
 _C.MIR1K = CN()
 _C.MIR1K.AUDIO_PATH = os.path.abspath('/home/wujammy/MIR-1K/Wavfile')
 _C.MIR1K.LABEL_PATH = os.path.abspath('/home/wujammy/MIR-1K/PitchLabel')
+
+
 
 # -----------------------------------------------------------------------------
 # Misc
