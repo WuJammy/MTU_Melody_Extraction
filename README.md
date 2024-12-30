@@ -14,9 +14,11 @@ pitch and chroma accuracy, positioning it as a leading solution
 for melody extraction in complex polyphonic scenarios.
 
 
-## Environment Set
-    •Python Version: 3.8.10
-    •PyTorch Version: 1.13.1
+## Environment SetUp
+    Python Version: 3.8.10
+    PyTorch Version: 1.13.1
+
+    
  
 
 
