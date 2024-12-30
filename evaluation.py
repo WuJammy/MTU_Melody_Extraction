@@ -19,15 +19,7 @@ import random
 import torch
 import torch.backends.cudnn as cudnn
 
-from mamba_unet.predict_model import melody_extraction_mamba_unet_model
-from unet_tensorflow.predict_model import melody_extraction_unet_tensorflow_model
-from unet_pytorch.predict_model import melody_extraction_unet_pytorch_model
-from swinunet.predict_model import melody_extraction_swinunet_model
 from mamba_transformer_unet.predict_model import melody_extraction_mamba_transformer_unet_model
-from unet_tensorflow.config import get_test_config as get_unet_tensorflow_test_config
-from unet_pytorch.config import get_test_config as get_unet_pytorch_test_config
-from swinunet.config import get_test_config as get_swinunet_test_config
-from mamba_unet.config import get_test_config as get_mamba_unet_test_config
 from mamba_transformer_unet.config import get_test_config as get_mamba_transformer_unet_test_config
 from utils import spectrum_to_pitches
 import medleydb as mdb
@@ -215,30 +207,8 @@ def evaluation_model(tests, args=None, save=True, model=None):
     average_evaluation_metrics_matrix = np.zeros((len(tests), 5), dtype=float)
 
     if model == None:
-        if args.model_type == 'swinunet':
-            # 1. swinunet
-            config = get_swinunet_test_config(args)
-            cudnn.benchmark = False
-            cudnn.deterministic = True
-            random.seed(config.SEED)
-            np.random.seed(config.SEED)
-            torch.manual_seed(config.SEED)
-            torch.cuda.manual_seed(config.SEED)
-            model = melody_extraction_swinunet_model(config)
-        elif args.model_type == 'unet_pytorch':
-            # 2. unet_pytorch
-            config = get_unet_pytorch_test_config(args)
-            model = melody_extraction_unet_pytorch_model(config)
-        elif args.model_type == 'unet_tensorflow':
-            # 3. unet_tensorflow
-            config = get_unet_tensorflow_test_config(args)
-            model = melody_extraction_unet_tensorflow_model(config)
-        elif args.model_type == 'mamba_unet':
-            # 4. mamba_unet
-            config = get_mamba_unet_test_config(args)
-            model = melody_extraction_mamba_unet_model(config)
-        elif args.model_type == 'mamba_transformer_unet':
-            # 5. mamba_transformer_unet
+        if args.model_type == 'mamba_transformer_unet':
+            #  mamba_transformer_unet
             config = get_mamba_transformer_unet_test_config(args)
             model = melody_extraction_mamba_transformer_unet_model(config)
         else:
@@ -342,10 +312,6 @@ if __name__ == '__main__':
         nargs='+',
     )
     args = parser.parse_args()
-    # args.model_type = 'swinunet'
-    # args.model_path = 'model/230808 swinunet/model.pth'
-    # args.output_dir_name = 'model/230808 swinunet'
-    # args.accuracy_file_name = 'orchset_accuracy.csv'
 
 
     tests = [ ('/home/wujammy/mirex05TrainFiles/', '.wav', 'REF.txt'),
