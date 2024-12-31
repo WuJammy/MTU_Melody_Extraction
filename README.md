@@ -36,7 +36,8 @@ for melody extraction in complex polyphonic scenarios.
   ```
   export MEDLEYDB_PATH="MedleyDB Dataset Path"
   ```
-  To make it permanent, add the above line ```~/.bashrc```.
+  To make it permanent, add the above line ```~/.bashrc```.  
+  Note : You may find ```yaml.load()``` errors while running the program. This is due to outdated syntax in the MedleyDB source code. Simply replace ```yaml.load(file)``` with ```yaml.load(file, Loader=yaml.FullLoader)```.
 - Librosa
   ```
   pip install librosa
