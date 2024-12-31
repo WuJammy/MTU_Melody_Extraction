@@ -16,7 +16,7 @@ for melody extraction in complex polyphonic scenarios.
 
 ## Environment SetUp
 - Python Version: 3.8.10
-- PyTorch Version: 1.13.1
+- PyTorch Version: 1.13.1  
   CUDA Version 11.6
   ```
   pip install torch==1.13.1+cu116 torchvision==0.14.1+cu116 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu116
@@ -46,9 +46,11 @@ for melody extraction in complex polyphonic scenarios.
   pip install causal-conv1d>=1.4.0
   pip install mamba-ssm
   ```
- 
-
-
- python train_umamba_transformer.py --max_epochs 200 --batch_size 32 --output_dir_name '/home/wujammy/melody_extraction_model'
-
- python evaluation.py --model_type mamba_transformer_unet --model_path '/home/wujammy/melody_extraction_model/model_mtu_200_batch32_c2_02bce08dice_guassionkernel15_sigmaX05_sigmaY2_eachcolumn_lr0001_3adamW0001_tt.pth' --output_dir_name '/home/wujammy/meldoy_extraction_result' --accuracy_file_name 'accuracy_mtu_kernel15t.csv'
+## Training Model
+ ```
+ python train_umamba_transformer.py --max_epochs 200 --batch_size 32 --output_dir_name 'Your Model Output Path'
+```
+## Evaluation Test Dataset
+ ```
+ python evaluation.py --model_type mamba_transformer_unet --model_path 'Your Model Path(.pth)' --output_dir_name 'Your Evaluation Output Path ' --accuracy_file_name 'Your Evaluation Result Name(.csv)'
+ ```
