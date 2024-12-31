@@ -49,6 +49,12 @@ for melody extraction in complex polyphonic scenarios.
   pip install causal-conv1d>=1.4.0
   pip install mamba-ssm
   ```
+## Dataset 
+- MedleyDB : https://medleydb.weebly.com/
+- ORCHSET : https://www.upf.edu/web/mtg/orchset
+- MIR-1K : http://mirlab.org/dataset/public/
+- ADC2004、MIREX05 : http://labrosa.ee.columbia.edu/projects/melody/
+
 ## Training Model
  ```
  python train_umamba_transformer.py --max_epochs 200 --batch_size 32 --output_dir_name 'Your Model Output Path'
