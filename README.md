@@ -15,8 +15,8 @@ for melody extraction in complex polyphonic scenarios.
 
 
 ## Environment SetUp
-    Python Version: 3.8.10
-    PyTorch Version: 1.13.1
+- Python Version: 3.8.10
+- PyTorch Version: 1.13.1
 ### Python Package List
 
     
