@@ -17,12 +17,35 @@ for melody extraction in complex polyphonic scenarios.
 ## Environment SetUp
 - Python Version: 3.8.10
 - PyTorch Version: 1.13.1
+  CUDA Version 11.6
+  ```
+  pip install torch==1.13.1+cu116 torchvision==0.14.1+cu116 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu116
+  ```
+  CUDA Version 11.7
+  ```
+  pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu117
+  ```
 - Download MeldeyDB Package
+  ```
   git clone https://github.com/marl/medleydb.git
   cd medleydb
   pip install .
-- 
-    
+  pip install -r requirements.txt
+  ```
+  Set MEDLEYDB_PATH to the local directory of MedleyDB
+  ```
+  export MEDLEYDB_PATH="MedleyDB Dataset Path"
+  ```
+  To make it permanent, add the above line ```~/.bashrc```.
+- Librosa
+  ```
+  pip install librosa
+  ```
+- Mamba
+  ```
+  pip install causal-conv1d>=1.4.0
+  pip install mamba-ssm
+  ```
  
 
 
