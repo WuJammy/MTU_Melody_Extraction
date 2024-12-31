@@ -15,7 +15,9 @@ for melody extraction in complex polyphonic scenarios.
 
 
 ## Environment SetUp
-- Python Version: 3.8.10
+- Python Version: 3.8.10  
+  You can use Miniconda to setup Python environment.  
+  Reference : https://docs.anaconda.com/miniconda/install/.
 - PyTorch Version: 1.13.1  
   CUDA Version 11.6
   ```
