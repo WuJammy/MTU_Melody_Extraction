@@ -20,7 +20,7 @@ from utils import get_medleydb_audio_names, Audio_dataset, DiceLoss, get_medleyd
 from torch.utils.data import ConcatDataset
 import mir_eval
 from torchstat import stat
-from fvcore.nn import FlopCountAnalysis
+
 
 def train_mamba_transformer_unet(config, save=True):
     cudnn.benchmark = False
@@ -32,7 +32,7 @@ def train_mamba_transformer_unet(config, save=True):
     if config.TRAIN.BATCH_SIZE != 24 and config.TRAIN.BATCH_SIZE % 6 == 0:
         config.TRAIN.BASE_LR *= config.TRAIN.BATCH_SIZE / 24
 
-    audio_mir1k_names = get_mir1k_audio_names(mik1k_folder_path='/home/wujammy/MIR-1K/Wavfile')
+    audio_mir1k_names = get_mir1k_audio_names()
     orchset_names = get_orchset_name()
     medleydb_train_audio_names = get_medleydb_train_audio_names()
     medleydb_validation_audio_names = get_medleydb_validation_audio_names()

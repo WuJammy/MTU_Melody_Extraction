@@ -266,19 +266,6 @@ def get_medleydb_audio_names():
     for mtrack in melody_multitracks:
         audio_names.append(mtrack.track_id)
 
-    # 移除一些壞掉的音檔
-    # audio_names.remove('AimeeNorwich_Child')
-
-    # folder_path = pathlib.Path('/home/ktpss97094/medleydb/Audio/')
-    # for subdir in folder_path.iterdir():
-    #     if subdir.is_dir():
-    #         for file in subdir.glob('*.wav'):
-    #             all_audio_file_name.append(file.stem)
-
-    # audio_path = pathlib.Path(dataset_config[dataset_name]['audio_folder_path'])
-    # for element in list((audio_path.glob("*.wav"))):
-    #     all_audio_file_name.append(pathlib.Path(element).stem)
-
     return audio_names
 
 
@@ -291,20 +278,15 @@ def get_medleydb_vocal_audio_names():
         for line in f:
             audio_names.append(line.strip())
 
-    #check the AimeeNorwich_Child is in the list or not
-    # if 'AimeeNorwich_Child' in audio_names:
-    #     audio_names.remove('AimeeNorwich_Child')
-
-
     return audio_names
 
 
 def get_medleydb_train_audio_names():
-    audio_names_non_vocal_path = '/home/wujammy/melody_extraction_swin/medleydb_train_names.txt'
+    medleydb_trian_names_path = '/home/wujammy/melody_extraction_swin/medleydb_train_names.txt'
 
     audio_names = []
 
-    with open(audio_names_non_vocal_path, 'r') as f:
+    with open( medleydb_trian_names_path, 'r') as f:
         for line in f:
             audio_names.append(line.strip())
 
@@ -322,11 +304,11 @@ def get_medleydb_test_audio_names():
     return audio_names
 
 def get_medleydb_validation_audio_names():
-    audio_names_non_vocal_path = '/home/wujammy/melody_extraction_swin/medleydb_valid_names.txt'
+    medleydb_valid_names_path = '/home/wujammy/melody_extraction_swin/medleydb_valid_names.txt'
 
     audio_names = []
 
-    with open(audio_names_non_vocal_path, 'r') as f:
+    with open(medleydb_valid_names_path, 'r') as f:
         for line in f:
             audio_names.append(line.strip())
 
@@ -537,8 +519,8 @@ def segment_audio_and_label(audio_path, padding_audio_path, label_path, audio_se
     return audio_segments, label_segments
 
 # mir1k dataset
-def get_mir1k_audio_names(mik1k_folder_path):
-    mir1k_path = mik1k_folder_path
+def get_mir1k_audio_names():
+    mir1k_path = '/home/wujammy/MIR-1K/Wavfile'
     
     audio_names = [file_name.stem for file_name in Path(mir1k_path).iterdir()]
 
