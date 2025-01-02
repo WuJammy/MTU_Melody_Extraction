@@ -59,7 +59,7 @@ for melody extraction in complex polyphonic scenarios.
 Training dataset paths can be configured in  ```utils.py```. Update the following: 
  ```
 def get_medleydb_train_audio_names():
-    audio_names_non_vocal_path = '/home/wujammy/melody_extraction_swin/medleydb_train_names.txt'
+    medleydb_trian_names_path = 'Your medleydb_train_names.txt Path'
 
     audio_names = []
 
@@ -71,7 +71,7 @@ def get_medleydb_train_audio_names():
  ```
  ```
 def get_medleydb_validation_audio_names():
-    audio_names_non_vocal_path = '/home/wujammy/melody_extraction_swin/medleydb_valid_names.txt'
+     medleydb_valid_names_path = 'Your medleydb_valid_names.txt Path'
 
     audio_names = []
 
@@ -85,7 +85,7 @@ def get_medleydb_validation_audio_names():
  ```
 def get_orchset_name():
 
-    orchset_path = '/home/wujammy/Orchset'
+    orchset_path = 'Your Orchset Path'
     
     #get all audio names(in dir)
     audio_names = [os.path.splitext(f)[0] for f in os.listdir(orchset_path) if f.endswith('.wav')]
@@ -94,7 +94,7 @@ def get_orchset_name():
  ```
  ```
 def get_mir1k_audio_names(mik1k_folder_path):
-    mir1k_path = mik1k_folder_path
+    mir1k_path = 'Your mir1k Path'
     
     audio_names = [file_name.stem for file_name in Path(mir1k_path).iterdir()]
 
