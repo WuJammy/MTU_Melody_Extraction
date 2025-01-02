@@ -55,13 +55,56 @@ for melody extraction in complex polyphonic scenarios.
 - MIR-1K : http://mirlab.org/dataset/public/
 - ADC2004、MIREX05 : http://labrosa.ee.columbia.edu/projects/melody/
 
+## Update Your Training Dataset Path
+Training dataset paths can be configured in  ```utils.py```. Update the following: 
+ ```
+def get_medleydb_train_audio_names():
+    audio_names_non_vocal_path = '/home/wujammy/melody_extraction_swin/medleydb_train_names.txt'
+
+    audio_names = []
+
+    with open(audio_names_non_vocal_path, 'r') as f:
+        for line in f:
+            audio_names.append(line.strip())
+
+    return audio_names
+ ```
+ ```
+def get_medleydb_validation_audio_names():
+    audio_names_non_vocal_path = '/home/wujammy/melody_extraction_swin/medleydb_valid_names.txt'
+
+    audio_names = []
+
+    with open(audio_names_non_vocal_path, 'r') as f:
+        for line in f:
+            audio_names.append(line.strip())
+
+    return audio_names
+ ```
+
+ ```
+def get_orchset_name():
+
+    orchset_path = '/home/wujammy/Orchset'
+    
+    #get all audio names(in dir)
+    audio_names = [os.path.splitext(f)[0] for f in os.listdir(orchset_path) if f.endswith('.wav')]
+    
+    return audio_names 
+ ```
+ ```
+def get_mir1k_audio_names(mik1k_folder_path):
+    mir1k_path = mik1k_folder_path
+    
+    audio_names = [file_name.stem for file_name in Path(mir1k_path).iterdir()]
+
+    return audio_names
+ ```
 ## Training Model
-- Change Training Dataset Path:  
-  ```utils.py```
  ```
  python train_umamba_transformer.py --max_epochs 200 --batch_size 32 --output_dir_name 'Your Model Output Path'
 ```
-## Change Test Dataset Path
+## Update Your Test Dataset Path
 Test dataset paths can be configured in ```evaluation.py```. Update the following: 
  ```
  tests = [ ('Your MIREX05 Path', '.wav', 'REF.txt'),
