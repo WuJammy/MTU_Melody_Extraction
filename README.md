@@ -61,9 +61,15 @@ for melody extraction in complex polyphonic scenarios.
  ```
  python train_umamba_transformer.py --max_epochs 200 --batch_size 32 --output_dir_name 'Your Model Output Path'
 ```
-## Evaluation Test Dataset
-- Change Test Dataset Path:  
-  ```evaluation.py```
+## Change Test Dataset Path
+Test dataset paths can be configured in ```evaluation.py```. Update the following: 
+ ```
+ tests = [ ('Your MIREX05 Path', '.wav', 'REF.txt'),
+              ('Your ADC2004 Path', '.wav', 'REF.txt'),
+              ('Yor MedleyDb Path(.txt file)','mdb','mdb'),
+             ]  
+ ```
+## Evaluation Test Dataset  
  ```
  python evaluation.py --model_type mamba_transformer_unet --model_path 'Your Model Path(.pth)' --output_dir_name 'Your Evaluation Output Path ' --accuracy_file_name 'Your Evaluation Result Name(.csv)'
  ```
