@@ -143,7 +143,7 @@ def evaluation_audio(model, audio_path, label_path, config, label_type='None'):
     file_name = os.path.basename(audio_path).split('/')[-1].split('.')[0]
 
     # #change midifile
-    change_midifile(hz_array, f'/home/wujammy/melody_extraction_swin/test_midi/{file_name}_gt.mid')
+    # change_midifile(hz_array, f'/home/wujammy/melody_extraction_swin/test_midi/{file_name}_gt.mid')
 
     # concate spectrums
     start_time = int(0)
@@ -189,7 +189,7 @@ def evaluation_audio(model, audio_path, label_path, config, label_type='None'):
     prediction = np.array(spectrum_to_pitches(merge_spectrum, config))
 
     #change midifile
-    change_midifile(prediction, f'/home/wujammy/melody_extraction_swin/test_midi/{file_name}_mtu.mid')    
+    # change_midifile(prediction, f'/home/wujammy/melody_extraction_swin/test_midi/{file_name}_mtu.mid')    
 
     return compute_metrics(groundtruth[:, 0], groundtruth[:, 1], prediction)
 
