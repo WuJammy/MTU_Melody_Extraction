@@ -121,5 +121,5 @@ Test dataset paths can be configured in ```evaluation.py```. Update the followin
 import change_midi
 change_midi.change_midifile(Your 1-D Hz Array , 'Your ouput.mid')
  ```
-## MTU 
+## MTU Pre-Trained Model
 Link : https://pcsnas.iottalk.tw:5001/sharing/aF2rpUqVC
