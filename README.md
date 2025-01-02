@@ -56,10 +56,13 @@ for melody extraction in complex polyphonic scenarios.
 - ADC2004、MIREX05 : http://labrosa.ee.columbia.edu/projects/melody/
 
 ## Training Model
+- Change Training Dataset Path:
+  ```utils.py```
  ```
  python train_umamba_transformer.py --max_epochs 200 --batch_size 32 --output_dir_name 'Your Model Output Path'
 ```
 ## Evaluation Test Dataset
+- Change Test Dataset Path:
  ```
  python evaluation.py --model_type mamba_transformer_unet --model_path 'Your Model Path(.pth)' --output_dir_name 'Your Evaluation Output Path ' --accuracy_file_name 'Your Evaluation Result Name(.csv)'
  ```
