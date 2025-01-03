@@ -116,7 +116,7 @@ Test dataset paths can be configured in ```evaluation.py```. Update the followin
  ```
  python evaluation.py --model_type mamba_transformer_unet --model_path 'Your Model Path(.pth)' --output_dir_name 'Your Evaluation Output Path ' --accuracy_file_name 'Your Evaluation Result Name(.csv)'
  ```
-## 1-D Hz to Midi File
+## Hz Sequence to Midi File
  ```
 import change_midi
 change_midi.change_midifile(Your 1-D Hz Array , 'Your ouput.mid')
