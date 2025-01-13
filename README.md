@@ -125,6 +125,11 @@ change_midi.change_midifile(Your 1-D Hz Array , 'Your ouput.mid')
 Link : https://pcsnas.iottalk.tw:5001/sharing/aF2rpUqVC
 
 ## Audio Change Midi File
- ```
+Update your MIDI file storage path 
+```
+change_midifile(prediction, f'Your midi file dir path /{audio_file_name}.mid')
+```
+Audio Change MIDI File
+```
 python audi0_change_midi.py --model_path 'Your Model Path' --output_midi_file_dir 'Your Output dir' --audio_path 'Your Input Audio Path'
  ```
