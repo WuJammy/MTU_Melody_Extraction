@@ -123,3 +123,8 @@ change_midi.change_midifile(Your 1-D Hz Array , 'Your ouput.mid')
  ```
 ## MTU Pre-Trained Model
 Link : https://pcsnas.iottalk.tw:5001/sharing/aF2rpUqVC
+
+## Audio Change Midi File
+ ```
+python audi0_change_midi.py --model_path 'Your Model Path' --output_midi_file_dir 'Your Output dir' --audio_path 'Your Input Audio Path'
+ ```
