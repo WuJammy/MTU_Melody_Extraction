@@ -131,5 +131,5 @@ change_midifile(prediction, f'Your midi file dir path /{audio_file_name}.mid')
 ```
 Audio Change MIDI File
 ```
-python audi0_change_midi.py --model_path 'Your Model Path' --output_midi_file_dir 'Your Output dir' --audio_path 'Your Input Audio Path'
+python audio_change_midi.py --model_path 'Your Model Path' --output_midi_file_dir 'Your Output dir' --audio_path 'Your Input Audio Path'
  ```
