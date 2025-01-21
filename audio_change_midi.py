@@ -116,7 +116,7 @@ print(merge_spectrum.shape)
 prediction = np.array(spectrum_to_pitches(merge_spectrum, config))
 
 
-change_midifile(prediction, f'/home/wujammy/melody_extraction_swin/{audio_file_name}.mid')    
+change_midifile(prediction, f'output_midi_file_dir/{audio_file_name}.mid')    
 
 
 
