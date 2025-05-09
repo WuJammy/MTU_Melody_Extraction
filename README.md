@@ -1,6 +1,6 @@
 # MTU: A Melody Extraction Method Using Swin U-Net Enhanced with Mamba Blocks
 ## Abstract
-MTU is a novel melody extraction method designed for polyphonic
+MTU is a melody extraction method designed for polyphonic
 audio, addressing both vocal and non-vocal music tracks. Its architecture
 integrates Swin U-Net with Mamba blocks, enhancing feature extraction and
 achieving multi-scale representation of intricate polyphonic music signals. A key
